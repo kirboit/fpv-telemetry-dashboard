@@ -135,7 +135,6 @@ fpv-telemetry-dashboard/
 
 - Windows only (tested on Windows 10/11)
 - Yaw uses Euler angles — gimbal lock can cause brief jumps at extreme angles
-- Battery voltage requires a LiPo to be connected after the USB cable
 
 ---
 
