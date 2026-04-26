@@ -1,0 +1,1051 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Drone Telemetry</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        background: #0a0a0f;
+        color: #fff;
+        font-family: "Segoe UI", sans-serif;
+        min-height: 100vh;
+      }
+
+      .app {
+        padding: 24px;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 28px;
+      }
+
+      .header h1 {
+        font-size: 22px;
+        font-weight: 600;
+      }
+
+      .header .port-tag {
+        font-size: 11px;
+        background: #1e1e2e;
+        padding: 3px 10px;
+        border-radius: 99px;
+        color: #555;
+      }
+
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #666;
+        transition: background 0.3s;
+      }
+
+      .status-dot.connected {
+        background: #00ff88;
+        box-shadow: 0 0 8px #00ff88;
+      }
+
+      .status-dot.disconnected {
+        background: #ff4444;
+        box-shadow: 0 0 8px #ff4444;
+        animation: pulse 1s infinite;
+      }
+
+      .status-dot.scanning {
+        background: #f0c040;
+        box-shadow: 0 0 8px #f0c040;
+        animation: pulse 0.5s infinite;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+
+        50% {
+          opacity: 0.3;
+        }
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .grid-bottom {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+      }
+
+      .card {
+        background: #111118;
+        border: 1px solid #1e1e2e;
+        border-radius: 16px;
+        padding: 20px;
+      }
+
+      .card-label {
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #555;
+        margin-bottom: 8px;
+      }
+
+      .card-value {
+        font-size: 36px;
+        font-weight: 700;
+        letter-spacing: -1px;
+        line-height: 1;
+      }
+
+      .card-unit {
+        font-size: 16px;
+        font-weight: 400;
+        color: #666;
+        margin-left: 4px;
+      }
+
+      .volt-bar-bg {
+        height: 6px;
+        background: #1e1e2e;
+        border-radius: 99px;
+        margin-top: 12px;
+        overflow: hidden;
+      }
+
+      .volt-bar {
+        height: 100%;
+        border-radius: 99px;
+        transition:
+          width 0.3s,
+          background 0.3s;
+      }
+
+      .attitude-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-top: 4px;
+      }
+
+      .att-item {
+        text-align: center;
+      }
+
+      .att-label {
+        font-size: 11px;
+        color: #555;
+        margin-bottom: 4px;
+      }
+
+      .att-value {
+        font-size: 22px;
+        font-weight: 600;
+      }
+
+      .motors-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-top: 8px;
+      }
+
+      .motor-header {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        margin-bottom: 6px;
+      }
+
+      .motor-name {
+        color: #555;
+      }
+
+      .motor-bar-bg {
+        height: 8px;
+        background: #1e1e2e;
+        border-radius: 99px;
+        overflow: hidden;
+      }
+
+      .motor-bar {
+        height: 100%;
+        border-radius: 99px;
+        transition: width 0.2s;
+      }
+
+      .banner {
+        position: fixed;
+        top: 16px;
+        right: 24px;
+        z-index: 100;
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-8px);
+        transition:
+          opacity 0.3s ease,
+          transform 0.3s ease;
+      }
+      .banner.visible {
+        opacity: 1;
+        pointer-events: all;
+        transform: translateY(0);
+      }
+      .banner-inner {
+        background: #1a1008;
+        border: 1px solid #f0c04060;
+        border-radius: 12px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+        min-width: 480px;
+      }
+      .banner-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #f0c040;
+        animation: pulse 1s infinite;
+        flex-shrink: 0;
+      }
+      .banner-text {
+        font-size: 13px;
+        color: #f0c040;
+        font-weight: 500;
+        white-space: nowrap;
+        flex: 1;
+      }
+      .banner-ports {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .banner-port {
+        font-size: 11px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        background: #2a1f08;
+        border: 1px solid #f0c04060;
+        color: #f0c040;
+        cursor: pointer;
+        transition: background 0.2s;
+        white-space: nowrap;
+        align-self: stretch;
+        display: flex;
+        align-items: center;
+      }
+      .banner-port:hover {
+        background: #f0c040;
+        color: #0a0a0f;
+      }
+      .banner-btn {
+        font-size: 12px;
+        padding: 8px 16px;
+        border-radius: 8px;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        transition: opacity 0.2s;
+        white-space: nowrap;
+        align-self: stretch;
+        display: flex;
+        align-items: center;
+      }
+      .banner-btn:hover {
+        opacity: 0.8;
+      }
+      .banner-btn-retry {
+        background: #f0c040;
+        color: #0a0a0f;
+      }
+      .banner-btn-scan {
+        background: #2a1f08;
+        color: #f0c040;
+        border: 1px solid #f0c04060;
+      }
+
+      canvas {
+        width: 100% !important;
+      }
+
+      .viz-card {
+        background: #111118;
+        border: 1px solid #1e1e2e;
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 16px;
+        position: relative;
+      }
+      .viz-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .viz-stats {
+        display: flex;
+        gap: 24px;
+      }
+      .viz-stat {
+        text-align: center;
+      }
+      .viz-stat-label {
+        font-size: 10px;
+        color: #555;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+      .viz-stat-value {
+        font-size: 15px;
+        font-weight: 600;
+        margin-top: 2px;
+      }
+      #drone-canvas {
+        width: 100% !important;
+        height: 280px;
+        border-radius: 10px;
+        background: transparent;
+        display: block;
+      }
+      .armed-badge {
+        font-size: 11px;
+        font-weight: 600;
+        padding: 3px 10px;
+        border-radius: 99px;
+        background: #1e1e2e;
+        color: #555;
+        letter-spacing: 0.05em;
+      }
+      .armed-badge.spinning {
+        background: rgba(0, 255, 136, 0.15);
+        color: #00ff88;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+      const { useState, useEffect, useRef, useCallback } = React;
+      const MOTOR_COLORS = ["#ff6b6b", "#00d4ff", "#a8ff78", "#f0c040"];
+
+      function DisconnectedBanner({
+        visible,
+        ports,
+        onRetry,
+        onConnect,
+        onScan,
+      }) {
+        return (
+          <div className={`banner ${visible ? "visible" : ""}`}>
+            <div className="banner-inner">
+              <div className="banner-dot" />
+              <div className="banner-text">Drone disconnected</div>
+              <div className="banner-ports">
+                {ports.map((p) => (
+                  <div
+                    key={p.port}
+                    className="banner-port"
+                    onClick={() => onConnect(p.port)}
+                  >
+                    {p.port} —{" "}
+                    {p.name.length > 20 ? p.name.slice(0, 20) + "…" : p.name}
+                  </div>
+                ))}
+              </div>
+              <button className="banner-btn banner-btn-retry" onClick={onRetry}>
+                ⟳ Retry
+              </button>
+              <button className="banner-btn banner-btn-scan" onClick={onScan}>
+                🔍 Scan
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      function VoltageCard({ voltage }) {
+        const pct = Math.max(
+          0,
+          Math.min(100, ((voltage - 3.3) / (4.2 - 3.3)) * 100),
+        );
+        const color = pct > 50 ? "#00ff88" : pct > 25 ? "#f0c040" : "#ff4444";
+        return (
+          <div className="card">
+            <div className="card-label">Battery Voltage</div>
+            <div className="card-value" style={{ color }}>
+              {voltage.toFixed(2)}
+              <span className="card-unit">V</span>
+            </div>
+            <div className="volt-bar-bg">
+              <div
+                className="volt-bar"
+                style={{ width: `${pct}%`, background: color }}
+              />
+            </div>
+          </div>
+        );
+      }
+
+      function AttitudeCard({ roll, pitch, yaw }) {
+        return (
+          <div className="card">
+            <div className="card-label">Attitude</div>
+            <div className="attitude-grid">
+              <div className="att-item">
+                <div className="att-label">ROLL</div>
+                <div className="att-value" style={{ color: "#00d4ff" }}>
+                  {roll.toFixed(1)}°
+                </div>
+              </div>
+              <div className="att-item">
+                <div className="att-label">PITCH</div>
+                <div className="att-value" style={{ color: "#ff6b6b" }}>
+                  {pitch.toFixed(1)}°
+                </div>
+              </div>
+              <div className="att-item">
+                <div className="att-label">YAW</div>
+                <div className="att-value" style={{ color: "#a8ff78" }}>
+                  {yaw.toFixed(0)}°
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      function MotorsCard({ motors }) {
+        return (
+          <div className="card">
+            <div className="card-label">Motor Output</div>
+            <div className="motors-grid">
+              {motors.map((val, i) => {
+                const pct = Math.max(
+                  0,
+                  Math.min(100, ((val - 1000) / 1000) * 100),
+                );
+                return (
+                  <div key={i}>
+                    <div className="motor-header">
+                      <span className="motor-name">M{i + 1}</span>
+                      <span style={{ color: MOTOR_COLORS[i], fontWeight: 600 }}>
+                        {val}µs
+                      </span>
+                    </div>
+                    <div className="motor-bar-bg">
+                      <div
+                        className="motor-bar"
+                        style={{
+                          width: `${pct}%`,
+                          background: MOTOR_COLORS[i],
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+
+      function LineChart({ datasets, yMin, yMax, height = 120 }) {
+        const ref = useRef();
+        const chartRef = useRef();
+
+        useEffect(() => {
+          const ctx = ref.current.getContext("2d");
+          chartRef.current = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels: Array(100).fill(""),
+              datasets: datasets.map((d) => ({
+                label: d.label,
+                data: Array(100).fill(0),
+                borderColor: d.color,
+                backgroundColor: d.fill ? d.color + "15" : "transparent",
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.4,
+                fill: !!d.fill,
+              })),
+            },
+            options: {
+              animation: false,
+              responsive: true,
+              plugins: {
+                legend: {
+                  display: datasets.length > 1,
+                  labels: { color: "#888", boxWidth: 12, font: { size: 10 } },
+                },
+              },
+              scales: {
+                x: { display: false },
+                y: {
+                  min: yMin,
+                  max: yMax,
+                  grid: { color: "#1e1e2e" },
+                  ticks: { color: "#555", font: { size: 10 } },
+                },
+              },
+            },
+          });
+          return () => chartRef.current.destroy();
+        }, []);
+
+        useEffect(() => {
+          if (!chartRef.current) return;
+          datasets.forEach((d, i) => {
+            chartRef.current.data.datasets[i].data = d.data;
+          });
+          chartRef.current.update("none");
+        }, [datasets]);
+
+        return <canvas ref={ref} height={height} />;
+      }
+
+      function useDroneScene(data) {
+        const sceneRef = useRef(null);
+        const propsRef = useRef([]);
+        const targetRot = useRef({ x: 0, y: 0, z: 0 });
+        const currentRot = useRef({ x: 0, y: 0, z: 0 });
+        const droneRef = useRef(null);
+        const animRef = useRef(null);
+
+        useEffect(() => {
+          const canvas = document.getElementById("drone-canvas");
+          if (!canvas || sceneRef.current) return;
+
+          const W = canvas.parentElement.clientWidth - 40;
+          const H = 280;
+          canvas.width = W;
+          canvas.height = H;
+
+          const renderer = new THREE.WebGLRenderer({
+            canvas,
+            antialias: true,
+            alpha: true,
+          });
+          renderer.setSize(W, H);
+          renderer.setPixelRatio(window.devicePixelRatio);
+          renderer.shadowMap.enabled = true;
+
+          const scene = new THREE.Scene();
+          const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100);
+          camera.position.set(0, 2.5, 5);
+          camera.lookAt(0, 0, 0);
+
+          // Lighting
+          const ambient = new THREE.AmbientLight(0xffffff, 0.4);
+          scene.add(ambient);
+
+          const keyLight = new THREE.DirectionalLight(0xffffff, 0.8);
+          keyLight.position.set(5, 8, 5);
+          keyLight.castShadow = true;
+          scene.add(keyLight);
+
+          const fillLight = new THREE.DirectionalLight(0x4488ff, 0.3);
+          fillLight.position.set(-5, 2, -3);
+          scene.add(fillLight);
+
+          const rimLight = new THREE.DirectionalLight(0x00ff88, 0.2);
+          rimLight.position.set(0, -3, -5);
+          scene.add(rimLight);
+
+          // Materials
+          const bodyMat = new THREE.MeshStandardMaterial({
+            color: 0x1a1a2e,
+            metalness: 0.7,
+            roughness: 0.3,
+          });
+          const armMat = new THREE.MeshStandardMaterial({
+            color: 0x222235,
+            metalness: 0.5,
+            roughness: 0.4,
+          });
+          const motorMat = new THREE.MeshStandardMaterial({
+            color: 0x333355,
+            metalness: 0.8,
+            roughness: 0.2,
+          });
+          const propMat = new THREE.MeshStandardMaterial({
+            color: 0x00d4ff,
+            metalness: 0.3,
+            roughness: 0.5,
+            transparent: true,
+            opacity: 0.85,
+          });
+          const propMat2 = new THREE.MeshStandardMaterial({
+            color: 0xff6b6b,
+            metalness: 0.3,
+            roughness: 0.5,
+            transparent: true,
+            opacity: 0.85,
+          });
+          const accentMat = new THREE.MeshStandardMaterial({
+            color: 0x00ff88,
+            emissive: 0x00ff88,
+            emissiveIntensity: 0.3,
+            metalness: 0.5,
+            roughness: 0.3,
+          });
+
+          const drone = new THREE.Group();
+
+          // Central body — top plate
+          const bodyTop = new THREE.Mesh(
+            new THREE.BoxGeometry(1.0, 0.08, 0.9),
+            bodyMat,
+          );
+          bodyTop.position.y = 0.1;
+          drone.add(bodyTop);
+
+          // Central body — bottom plate
+          const bodyBot = new THREE.Mesh(
+            new THREE.BoxGeometry(0.9, 0.06, 0.8),
+            bodyMat,
+          );
+          bodyBot.position.y = -0.05;
+          drone.add(bodyBot);
+
+          // FC board (green accent)
+          const fc = new THREE.Mesh(
+            new THREE.BoxGeometry(0.35, 0.03, 0.35),
+            accentMat,
+          );
+          fc.position.y = 0.155;
+          drone.add(fc);
+
+          // Camera mount
+          const camMount = new THREE.Mesh(
+            new THREE.BoxGeometry(0.18, 0.14, 0.06),
+            bodyMat,
+          );
+          camMount.position.set(0.42, 0.06, 0);
+          drone.add(camMount);
+
+          const camLens = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.05, 0.05, 0.04, 16),
+            new THREE.MeshStandardMaterial({
+              color: 0x111111,
+              metalness: 0.9,
+              roughness: 0.1,
+            }),
+          );
+          camLens.rotation.z = Math.PI / 2;
+          camLens.position.set(0.46, 0.06, 0);
+          drone.add(camLens);
+
+          // Arms — X configuration (Meteor 75 Pro style)
+          const armPositions = [
+            { x: 0.72, z: -0.72, propColor: propMat }, // FR
+            { x: -0.72, z: -0.72, propColor: propMat2 }, // FL
+            { x: 0.72, z: 0.72, propColor: propMat2 }, // RR
+            { x: -0.72, z: 0.72, propColor: propMat }, // RL
+          ];
+
+          armPositions.forEach(({ x, z, propColor }, i) => {
+            // Arm
+            const armGroup = new THREE.Group();
+
+            const arm = new THREE.Mesh(
+              new THREE.BoxGeometry(0.12, 0.06, 0.12),
+              armMat,
+            );
+
+            // Arm tube connecting body to motor
+            const dx = x;
+            const dz = z;
+            const len = Math.sqrt(dx * dx + dz * dz);
+            const armTube = new THREE.Mesh(
+              new THREE.BoxGeometry(len * 0.92, 0.05, 0.07),
+              armMat,
+            );
+            armTube.position.set(x / 2, 0.01, z / 2);
+            armTube.rotation.y = -Math.atan2(dz, dx);
+            drone.add(armTube);
+
+            // Motor bell
+            const motor = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.13, 0.11, 0.1, 16),
+              motorMat,
+            );
+            motor.position.set(x, 0.05, z);
+            drone.add(motor);
+
+            // Motor shaft
+            const shaft = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.02, 0.02, 0.06, 8),
+              new THREE.MeshStandardMaterial({
+                color: 0x888888,
+                metalness: 0.9,
+                roughness: 0.1,
+              }),
+            );
+            shaft.position.set(x, 0.13, z);
+            drone.add(shaft);
+
+            // Propeller group
+            const propGroup = new THREE.Group();
+            propGroup.position.set(x, 0.16, z);
+
+            // Two blades
+            for (let b = 0; b < 2; b++) {
+              const blade = new THREE.Mesh(
+                new THREE.BoxGeometry(0.55, 0.015, 0.09),
+                propColor,
+              );
+              blade.rotation.y = (b * Math.PI) / 2;
+              // Blade twist
+              blade.rotation.z = b === 0 ? 0.08 : -0.08;
+              propGroup.add(blade);
+
+              // Blade tip rounding effect
+              const tip = new THREE.Mesh(
+                new THREE.SphereGeometry(0.045, 8, 8),
+                propColor,
+              );
+              tip.position.set(b === 0 ? 0.27 : 0, 0, b === 0 ? 0 : 0.27);
+              propGroup.add(tip);
+            }
+
+            // Prop hub
+            const hub = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.04, 0.04, 0.03, 12),
+              motorMat,
+            );
+            propGroup.add(hub);
+
+            drone.add(propGroup);
+            propsRef.current.push({
+              group: propGroup,
+              dir: i % 2 === 0 ? 1 : -1,
+            });
+          });
+
+          // Landing legs
+          const legPositions = [
+            { x: 0.3, z: 0.3 },
+            { x: -0.3, z: 0.3 },
+            { x: 0.3, z: -0.3 },
+            { x: -0.3, z: -0.3 },
+          ];
+          legPositions.forEach(({ x, z }) => {
+            const leg = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.015, 0.015, 0.22, 8),
+              new THREE.MeshStandardMaterial({
+                color: 0x333333,
+                metalness: 0.3,
+              }),
+            );
+            leg.position.set(x, -0.16, z);
+            drone.add(leg);
+
+            const foot = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.02, 0.02, 0.06, 8),
+              new THREE.MeshStandardMaterial({ color: 0x222222 }),
+            );
+            foot.rotation.x = Math.PI / 2;
+            foot.position.set(x, -0.26, z);
+            drone.add(foot);
+          });
+
+          // Grid floor
+          const grid = new THREE.GridHelper(8, 20, 0x1e1e2e, 0x1a1a2e);
+          grid.position.y = -1.2;
+          scene.add(grid);
+
+          scene.add(drone);
+          droneRef.current = drone;
+          sceneRef.current = { renderer, scene, camera };
+
+          // Animate
+          let frame = 0;
+          const animate = () => {
+            animRef.current = requestAnimationFrame(animate);
+            frame++;
+
+            // Smooth quaternion interpolation
+            if (droneRef.current.userData.targetQ) {
+              droneRef.current.quaternion.slerp(
+                droneRef.current.userData.targetQ,
+                0.08,
+              );
+            }
+
+            // Spin props
+            propsRef.current.forEach(({ group, dir }, i) => {
+              const motorsData = window.__droneMotors || [0, 0, 0, 0];
+              const val = motorsData[i] || 0;
+              const isSpinning = val > 1050;
+              if (isSpinning) {
+                const speed = (val - 1050) / 950;
+                group.rotation.y += dir * (0.08 + speed * 0.5);
+              }
+            });
+
+            renderer.render(scene, camera);
+          };
+          animate();
+
+          // Resize handler
+          const handleResize = () => {
+            const w = canvas.parentElement.clientWidth - 40;
+            camera.aspect = w / H;
+            camera.updateProjectionMatrix();
+            renderer.setSize(w, H);
+          };
+          window.addEventListener("resize", handleResize);
+
+          return () => {
+            cancelAnimationFrame(animRef.current);
+            window.removeEventListener("resize", handleResize);
+            renderer.dispose();
+            sceneRef.current = null;
+          };
+        }, []);
+
+        // Update rotation target from live data
+        useEffect(() => {
+          if (!droneRef.current) return;
+          const toRad = (deg) => (deg * Math.PI) / 180;
+          const q = new THREE.Quaternion();
+          const euler = new THREE.Euler(
+            toRad(-data.pitch),
+            toRad(-data.yaw),
+            toRad(-data.roll),
+            "YZX",
+          );
+          q.setFromEuler(euler);
+          // Store target quaternion for slerp in animate loop
+          droneRef.current.userData.targetQ = q;
+          window.__droneMotors = data.motors;
+        }, [data]);
+      }
+
+      function App() {
+        const [data, setData] = useState({
+          voltage: 0,
+          roll: 0,
+          pitch: 0,
+          yaw: 0,
+          motors: [0, 0, 0, 0],
+        });
+        const [connStatus, setConn] = useState("disconnected");
+        const [currentPort, setCurrentPort] = useState(null);
+        const [availPorts, setAvailPorts] = useState([]);
+        const [showOverlay, setShowOverlay] = useState(true);
+        const [voltH, setVoltH] = useState(Array(100).fill(0));
+        const [rollH, setRollH] = useState(Array(100).fill(0));
+        const [pitchH, setPitchH] = useState(Array(100).fill(0));
+        const [yawH, setYawH] = useState(Array(100).fill(0));
+        const [craftName, setCraftName] = useState("Drone");
+        const wsRef = useRef(null);
+
+        useDroneScene(data);
+
+        const clamp = (h, next, maxDelta = 45) =>
+          Math.abs(next - h[h.length - 1]) > maxDelta ? h[h.length - 1] : next;
+
+        const send = (obj) => {
+          if (wsRef.current && wsRef.current.readyState === 1)
+            wsRef.current.send(JSON.stringify(obj));
+        };
+
+        useEffect(() => {
+          const ws = new WebSocket("ws://localhost:8765");
+          wsRef.current = ws;
+
+          ws.onopen = () => setConn("connected");
+          ws.onclose = () => {
+            setConn("disconnected");
+            setShowOverlay(true);
+          };
+          ws.onerror = () => {
+            setConn("error");
+            setShowOverlay(true);
+          };
+
+          ws.onmessage = (e) => {
+            const d = JSON.parse(e.data);
+
+            if (d.status === "disconnected" || d.status === "error") {
+              setShowOverlay(true);
+              setAvailPorts(d.ports || []);
+              setConn("disconnected");
+              return;
+            }
+
+            if (d.craft_name) setCraftName(d.craft_name);
+
+            if (d.status === "scanning") {
+              setAvailPorts(d.ports || []);
+              return;
+            }
+
+            if (d.status === "connected" && d.voltage !== undefined) {
+              setCurrentPort(d.port);
+              setShowOverlay(false);
+              setConn("connected");
+              setData(d);
+              setVoltH((h) => {
+                const n = [...h];
+                n.shift();
+                n.push(d.voltage);
+                return n;
+              });
+              setRollH((h) => {
+                const n = [...h];
+                n.shift();
+                n.push(clamp(h, d.roll));
+                return n;
+              });
+              setPitchH((h) => {
+                const n = [...h];
+                n.shift();
+                n.push(clamp(h, d.pitch));
+                return n;
+              });
+              setYawH((h) => {
+                const n = [...h];
+                n.shift();
+                n.push(clamp(h, d.yaw));
+                return n;
+              });
+            }
+          };
+
+          return () => ws.close();
+        }, []);
+
+        return (
+          <div className="app">
+            <DisconnectedBanner
+              visible={showOverlay}
+              ports={availPorts}
+              onRetry={() => send({ action: "retry" })}
+              onConnect={(port) => send({ action: "connect", port })}
+              onScan={() => send({ action: "scan" })}
+            />
+
+            <div className="header">
+              <div className={`status-dot ${connStatus}`} />
+              <h1>🚁 {craftName} — Live Telemetry</h1>
+              {currentPort && <span className="port-tag">{currentPort}</span>}
+            </div>
+
+            <div className="grid">
+              <VoltageCard voltage={data.voltage} />
+              <AttitudeCard
+                roll={data.roll}
+                pitch={data.pitch}
+                yaw={data.yaw}
+              />
+              <MotorsCard motors={data.motors} />
+            </div>
+            <div className="viz-card">
+              <div className="viz-header">
+                <div className="card-label">3D Attitude Visualizer</div>
+                <div className="viz-stats">
+                  <div className="viz-stat">
+                    <div className="viz-stat-label">Roll</div>
+                    <div
+                      className="viz-stat-value"
+                      style={{ color: "#00d4ff" }}
+                    >
+                      {data.roll.toFixed(1)}°
+                    </div>
+                  </div>
+                  <div className="viz-stat">
+                    <div className="viz-stat-label">Pitch</div>
+                    <div
+                      className="viz-stat-value"
+                      style={{ color: "#ff6b6b" }}
+                    >
+                      {data.pitch.toFixed(1)}°
+                    </div>
+                  </div>
+                  <div className="viz-stat">
+                    <div className="viz-stat-label">Yaw</div>
+                    <div
+                      className="viz-stat-value"
+                      style={{ color: "#a8ff78" }}
+                    >
+                      {data.yaw.toFixed(0)}°
+                    </div>
+                  </div>
+                </div>
+                <div
+                  className={`armed-badge ${data.motors && data.motors.some((m) => m > 1050) ? "spinning" : ""}`}
+                >
+                  {data.motors && data.motors.some((m) => m > 1050)
+                    ? "● ARMED"
+                    : "○ DISARMED"}
+                </div>
+              </div>
+              <canvas id="drone-canvas"></canvas>
+            </div>
+
+            <div className="grid-bottom">
+              <div className="card">
+                <div className="card-label">Voltage History</div>
+                <LineChart
+                  yMin={3.0}
+                  yMax={4.4}
+                  datasets={[
+                    {
+                      label: "Voltage",
+                      color: "#f0c040",
+                      data: voltH,
+                      fill: true,
+                    },
+                  ]}
+                />
+              </div>
+              <div className="card">
+                <div className="card-label">Attitude History</div>
+                <LineChart
+                  yMin={-180}
+                  yMax={360}
+                  datasets={[
+                    { label: "Roll", color: "#00d4ff", data: rollH },
+                    { label: "Pitch", color: "#ff6b6b", data: pitchH },
+                    { label: "Yaw", color: "#a8ff78", data: yawH },
+                  ]}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>
