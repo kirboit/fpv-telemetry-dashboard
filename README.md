@@ -68,7 +68,7 @@ The backend communicates with the flight controller using the **MSP (MultiWii Se
 ### Requirements
 
 - Python 3.8+
-- A Betaflight flight controller connected via USB
+- A flight controller connected via USB
 - A modern browser (Chrome recommended)
 
 ### Install dependencies
