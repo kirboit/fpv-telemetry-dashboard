@@ -33,8 +33,9 @@ Connects to your drone over USB and visualizes live flight data in the browser â
 
 ## Hardware
 
-Tested on **BETAFPV Meteor 75 Pro** running Betaflight 4.x.
-Should work with any Betaflight flight controller that supports MSP over USB.
+Tested on Betaflight 4.x. Should be compatible with any flight controller 
+firmware that supports MSP over USB, including iNav and Cleanflight, 
+though this has not been verified.
 
 ---
 
@@ -134,7 +135,6 @@ fpv-telemetry-dashboard/
 
 - Windows only (tested on Windows 10/11)
 - Yaw uses Euler angles â€” gimbal lock can cause brief jumps at extreme angles
-- Battery voltage requires a LiPo to be connected after the USB cable
 
 ---
 
