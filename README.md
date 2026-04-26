@@ -74,7 +74,7 @@ The backend communicates with the flight controller using the **MSP (MultiWii Se
 ### Install dependencies
 
 ```bash
-pip install pyserial websockets
+pip install -r requirements.txt
 ```
 
 ### Run
