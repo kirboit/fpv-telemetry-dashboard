@@ -181,20 +181,19 @@ async def telemetry_handler(websocket):
                     pass
             ser = serial.Serial(port, BAUD_RATE, timeout=0.5, write_timeout=0.5)
             current_port = port
-            craft_name = get_craft_name(ser) or "Unknown Drone"
             fail_count = 0
             detect_voltage_command(ser)
-            craft_name = get_craft_name(ser)
+            craft_name = get_craft_name(ser) or "Unknown Drone"
+            print(f"🚁 Craft name: {craft_name}")
             await websocket.send(
                 json.dumps(
                     {
                         "status": "connected",
                         "port": port,
-                        "craft_name": craft_name or "Unknown Drone",
+                        "craft_name": craft_name,
                     }
                 )
             )
-            await websocket.send(json.dumps({"status": "connected", "port": port}))
             print(f"✅ Connected to {port}")
             return True
         except Exception as e:
