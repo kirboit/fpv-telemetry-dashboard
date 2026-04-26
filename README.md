@@ -27,7 +27,7 @@ Connects to your drone over USB and visualizes live flight data in the browser â
 | Backend | Python 3, `pyserial`, `websockets` |
 | Protocol | MSP (MultiWii Serial Protocol) over USB |
 | Frontend | React 18 (via CDN), Chart.js, Three.js |
-| Transport | WebSocket (`ws://localhost:8765`) |
+| Transport | WebSocket |
 
 ---
 
