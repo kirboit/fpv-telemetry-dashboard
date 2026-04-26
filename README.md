@@ -79,15 +79,14 @@ pip install pyserial websockets
 
 ### Run
 
-1. Close Betaflight Configurator if open (only one program can use the COM port at a time)
-2. Plug in your drone via USB
-3. Start the server:
+1. Plug in your drone via USB
+2. Start the server:
 
 ```bash
 python drone_server.py
 ```
 
-4. Open `index.html` in your browser
+3. Open `index.html` in your browser
 
 The dashboard will auto-detect your flight controller and connect automatically.
 
